@@ -1,6 +1,6 @@
 ---
 title: "Insurance Veri Madenciliği Projesi"
-author: "Doruk Kopdağ"
+author: "Duygu Eryılmaz"
 date: "2026-05-11"
 output: html_document
 ---
