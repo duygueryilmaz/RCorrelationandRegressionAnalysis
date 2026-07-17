@@ -1,0 +1,373 @@
+---
+title: "Insurance Veri Madenciliği Projesi"
+author: "Doruk Kopdağ"
+date: "2026-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Gerekli Paketler
+
+```{r paketler}
+library(tidyverse)
+library(broom)
+library(pROC)
+```
+
+# Veri Setinin Yüklenmesi
+
+```{r veri-yukleme}
+veri <- read.csv("insurance.csv")
+df <- veri
+```
+
+# Veri Seti Hakkında Bilgi
+
+Bu projede kullanılan veri seti **insurance** veri setidir. Veri madenciliği kapsamında bireylerin yaş, cinsiyet, BMI, çocuk sayısı, sigara kullanımı, bölge ve sigorta maliyeti değişkenleri incelenmiştir.
+
+```{r veri-bilgi}
+head(df)
+dim(df)
+str(df)
+summary(df)
+```
+
+# Değişken Açıklamaları
+
+| Değişken | Tür | Açıklama |
+|---|---|---|
+| age | Sayısal | Yaş |
+| sex | Kategorik | Cinsiyet |
+| bmi | Sayısal | Vücut kitle indeksi |
+| children | Sayısal | Çocuk sayısı |
+| smoker | Kategorik | Sigara kullanımı |
+| region | Kategorik | Bölge |
+| charges | Sayısal | Sigorta maliyeti |
+
+# Frekans Analizi
+
+```{r frekans-analizi}
+table(df$sex)
+table(df$smoker)
+table(df$region)
+```
+
+Bu bölümde kategorik değişkenlerin dağılımları incelenmiştir.
+
+# Korelasyon Analizi
+
+```{r korelasyon-analizi}
+cor(df$age, df$charges)
+cor(df$bmi, df$charges)
+cor(df$children, df$charges)
+```
+
+## Korelasyon Yorumu
+
+Korelasyon katsayısı -1 ile +1 arasında değer almaktadır.
+
+- +1'e yakın değer güçlü pozitif ilişkiyi gösterir.
+- -1'e yakın değer güçlü negatif ilişkiyi gösterir.
+- 0'a yakın değer zayıf ilişkiyi gösterir.
+
+Bu projede korelasyon analizi ile yaş, BMI ve çocuk sayısı değişkenlerinin sigorta maliyeti ile ilişkisi incelenmiştir.
+
+# Nihai Veri Seti Oluşturma: 8 Aşama
+
+## 1. Veri Toplama
+
+Insurance veri seti projeye aktarılmıştır. Veri setinde bireylerin demografik ve sağlıkla ilişkili bilgileri yer almaktadır.
+
+## 2. Veri Setini İnceleme
+
+```{r veri-inceleme}
+names(df)
+dim(df)
+head(df)
+```
+
+Veri setindeki satır ve sütun sayısı incelenmiş, değişken isimleri kontrol edilmiştir.
+
+## 3. Eksik Veri Kontrolü
+
+```{r eksik-veri}
+colSums(is.na(df))
+```
+
+Eksik veri kontrolü yapılarak analiz öncesinde veri setinde boş değer olup olmadığı incelenmiştir.
+
+## 4. Aykırı Değer Kontrolü
+
+```{r aykiri-deger}
+boxplot(df$charges,
+        main = "Sigorta Maliyeti Aykırı Deger Kontrolu",
+        ylab = "Sigorta Maliyeti")
+```
+
+Boxplot grafiği ile sigorta maliyeti değişkeninde aykırı değer olup olmadığı görsel olarak incelenmiştir.
+
+bmı değişkeni için boxplot ekleme
+
+## 5. Veri Dönüştürme
+
+```{r veri-donusturme}
+df$sex <- as.factor(df$sex)
+df$smoker <- as.factor(df$smoker)
+df$region <- as.factor(df$region)
+
+str(df)
+```
+
+Kategorik değişkenler faktör veri tipine dönüştürülmüştür.
+
+## 6. Kodlama İşlemi
+
+```{r kodlama-islemi}
+df$smoker_binary <- ifelse(df$smoker == "yes", 1, 0)
+
+table(df$smoker, df$smoker_binary)
+```
+
+Lojistik regresyon için sigara kullanımı değişkeni 0-1 formatına dönüştürülmüştür.
+
+- 1 = Sigara içiyor
+- 0 = Sigara içmiyor
+
+## 7. Özellik Seçimi
+
+```{r ozellik-secimi}
+secili_degiskenler <- c("age", "bmi", "children", "smoker_binary", "charges")
+secili_degiskenler
+```
+
+Regresyon ve lojistik regresyon analizleri için kullanılacak değişkenler belirlenmiştir.
+
+## 8. Nihai Veri Seti Oluşturma
+
+```{r nihai-veri-seti}
+nihai_veri <- df[, c("age", "bmi", "children", "smoker_binary", "charges")]
+head(nihai_veri)
+summary(nihai_veri)
+```
+
+Bu aşamada analizde kullanılacak nihai veri seti oluşturulmuştur.
+
+# Basit Doğrusal Regresyon
+
+```{r basit-regresyon}
+lm1 <- lm(charges ~ age, data = df)
+summary(lm1)
+```
+
+## Model Yorumu
+
+Bu modelde yaş değişkeninin sigorta maliyeti üzerindeki etkisi incelenmiştir. Yaş arttıkça sigorta maliyetinin de artma eğiliminde olduğu gözlemlenmektedir.
+
+# Çoklu Doğrusal Regresyon
+
+```{r coklu-regresyon}
+options(scipen=999)
+model1 <- lm(charges ~ age + bmi + children, data = df)
+model2 <- lm(charges ~ age + bmi + smoker_binary, data = df)
+model3 <- lm(charges ~ age + sex + bmi + children + smoker + region, data = df)
+
+summary(model1)
+summary(model2)
+summary(model3)
+```
+
+# Model Karşılaştırmaları
+
+```{r model-karsilastirma}
+compare_models <- function(model, actual) {
+  preds <- predict(model)
+  rmse <- sqrt(mean((actual - preds)^2))
+  mae <- mean(abs(actual - preds))
+  r2 <- summary(model)$r.squared
+  return(c(RMSE = rmse, MAE = mae, R2 = r2))
+}
+
+results <- rbind(
+  Model_1 = compare_models(model1, df$charges),
+  Model_2 = compare_models(model2, df$charges),
+  Model_3 = compare_models(model3, df$charges)
+)
+
+round(results, 3)
+```
+
+## Seçilen Model: Model 3
+
+Model 3, diğer modellere göre daha fazla değişken içerdiği için sigorta maliyetini açıklamada daha kapsamlıdır. Bu nedenle tahmin aşamasında **Model 3** seçilmiştir.
+
+# Regresyon İçin Tahmin
+
+```{r regresyon-tahmin}
+yeni_kisi_regresyon <- data.frame(
+  age = 40,
+  sex = factor("male", levels = levels(df$sex)),
+  bmi = 28,
+  children = 2,
+  smoker = factor("yes", levels = levels(df$smoker)),
+  region = factor("southeast", levels = levels(df$region))
+)
+
+regresyon_tahmini <- predict(model3, newdata = yeni_kisi_regresyon)
+regresyon_tahmini
+```
+
+## Regresyon Tahmin Yorumu
+
+Oluşturulan bağımsız yeni kişi için Model 3 kullanılarak tahmini sigorta maliyeti hesaplanmıştır. Tahmin sonucu, kişinin yaş, cinsiyet, BMI, çocuk sayısı, sigara kullanımı ve bölge bilgilerine göre beklenen sigorta maliyetini göstermektedir.
+
+# Katsayı Yorumları
+
+## age
+
+Yaş arttıkça sigorta maliyeti artma eğilimindedir.
+
+## bmi
+
+BMI değeri arttıkça sağlık riskleri artabileceği için sigorta maliyeti yükselebilir.
+
+## smoker
+
+Sigara kullanan bireylerin sigorta maliyetleri daha yüksek olabilir.
+
+## children
+
+Çocuk sayısı sigorta maliyetini etkileyebilmektedir.
+
+# Lojistik Regresyon: Sigara İçen / İçmeyen Analizi
+
+Bu bölümde lojistik regresyon analizi ile bireyin sigara içip içmediği tahmin edilmiştir. Bağımlı değişken **smoker_binary** değişkenidir.
+
+- 1 = Sigara içiyor
+- 0 = Sigara içmiyor
+
+```{r lojistik-regresyon}
+lojistik_model <- glm(smoker_binary ~ age + bmi + children + charges,
+                      data = df,
+                      family = binomial)
+
+summary(lojistik_model)
+```
+
+## Lojistik Regresyon Yorumu
+
+Bu modelde bireyin yaş, BMI, çocuk sayısı ve sigorta maliyeti bilgilerine göre sigara içme olasılığı tahmin edilmektedir. Lojistik regresyon sonucu 0 ile 1 arasında bir olasılık üretir.
+
+- Olasılık 0.50 ve üzerindeyse birey **sigara içiyor** şeklinde sınıflandırılır.
+- Olasılık 0.50'nin altındaysa birey **sigara içmiyor** şeklinde sınıflandırılır.
+
+# Lojistik Regresyon İçin Tahmin
+
+```{r lojistik-tahmin}
+yeni_kisi_lojistik <- data.frame(
+  age = 40,
+  bmi = 28,
+  children = 2,
+  charges = as.numeric(regresyon_tahmini)
+)
+
+sigara_olasiligi <- predict(lojistik_model,
+                            newdata = yeni_kisi_lojistik,
+                            type = "response")
+
+sigara_sinifi <- ifelse(sigara_olasiligi >= 0.5,
+                        "Sigara içiyor",
+                        "Sigara içmiyor")
+
+sigara_olasiligi
+sigara_sinifi
+```
+
+## Lojistik Tahmin Yorumu
+
+Yeni oluşturulan bağımsız kişi için sigara içme olasılığı hesaplanmıştır. Elde edilen olasılık 0.50 eşik değerine göre değerlendirilmiş ve birey **sigara içiyor / sigara içmiyor** şeklinde sınıflandırılmıştır.
+
+# Lojistik Regresyon Olasılık Dağılımı
+
+```{r lojistik-olasilik-dagilimi}
+probs <- predict(lojistik_model, type = "response")
+
+hist(probs,
+     main = "Sigara İçme Olasılıklarının Dağılımı",
+     xlab = "Sigara İçme Olasılığı",
+     ylab = "Frekans")
+
+abline(v = 0.5, col = "red")
+```
+# Lojistik Regresyon Olasılık Dağılımı Yorumu
+Lojistik regresyon modelinin tahmin ettiği sigara içme olasılıklarının dağılımını göstermektedir.
+
+# ROC Eğrisi
+
+```{r roc-egrisi}
+roc_obj <- roc(df$smoker_binary, probs)
+
+plot(roc_obj,
+     main = paste("ROC Eğrisi - AUC:", round(auc(roc_obj), 3)),
+     lwd = 4,
+     print.auc = TRUE,
+     auc.polygon = TRUE)
+
+abline(a = 0, b = 1, lty = 2, col = "red")
+```
+# ROC Eğrisi Yorumu
+ROC eğrisi modeli değerlendirmek için kullanılmıştır.
+Eğri altında kalan alanın (AUC) değeri modelin sınıflandırma başarısını göstermektedir.
+AUC değeri 1’e yaklaştıkça modelin başarısı artar, 0.5’e yakın olması ise modelin rastgele tahmin yaptığını gösterir.
+Grafikteki kırmızı kesikli çizgi rastgele tahmin doğrusunu ifade etmektedir.
+
+# Grafikler
+
+```{r yas-charges-grafik}
+plot(df$age, df$charges,
+     main = "Yaş ve Sigorta Maliyeti İlişkisi",
+     xlab = "Yaş",
+     ylab = "Sigorta Maliyeti")
+```
+
+Bu grafik yaş ile sigorta maliyeti arasındaki ilişkiyi göstermektedir.
+
+```{r bmi-charges-grafik}
+ggplot(df, aes(x = bmi, y = charges)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "BMI ve Sigorta Maliyeti İlişkisi",
+       x = "BMI",
+       y = "Sigorta Maliyeti")
+```
+
+Bu grafik BMI ile sigorta maliyeti arasındaki ilişkiyi göstermektedir.
+
+```{r smoker-charges-grafik}
+ggplot(df, aes(x = smoker, y = charges, fill = smoker)) +
+  geom_boxplot() +
+  labs(title = "Sigara Kullanımı ve Sigorta Maliyeti",
+       x = "Sigara Kullanımı",
+       y = "Sigorta Maliyeti")
+```
+
+Bu grafik sigara kullanan ve kullanmayan bireylerin sigorta maliyet dağılımlarını göstermektedir.
+
+# Sonuç
+
+Bu projede insurance veri seti üzerinde veri madenciliği süreci uygulanmıştır. Projede önce veri seti incelenmiş, eksik veri ve aykırı değer kontrolleri yapılmış, değişken dönüşümleri gerçekleştirilmiş ve nihai veri seti oluşturulmuştur.
+
+Analiz kapsamında:
+
+- Korelasyon analizi,
+- Basit doğrusal regresyon,
+- Çoklu doğrusal regresyon,
+- Model 3 ile sigorta maliyeti tahmini,
+- Lojistik regresyon ile sigara içen / içmeyen tahmini,
+- ROC eğrisi ve grafiksel analizler
+
+yapılmıştır.
+
+Sonuç olarak yaş, BMI, çocuk sayısı, sigara kullanımı ve bölge değişkenlerinin sigorta maliyeti üzerinde etkili olabileceği görülmüştür. Ayrıca lojistik regresyon ile bireyin sigara içme olasılığı 0-1 sınıflandırma mantığına göre analiz edilmiştir.
